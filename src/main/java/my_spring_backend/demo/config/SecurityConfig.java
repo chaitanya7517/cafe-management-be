@@ -11,13 +11,19 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // disable CSRF for APIs
+                // Disable CSRF for APIs (we'll rely on JWT later)
+                .csrf(csrf -> csrf.disable())
+
+                // Authorize requests
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll() // allow register/login APIs
-                        .anyRequest().authenticated() // secure everything else
+                        .requestMatchers("/auth/**").permitAll()   // allow register/login
+                        .requestMatchers("/api/**").permitAll()    // allow all API endpoints for now
+                        .anyRequest().authenticated()              // secure everything else
                 )
-                .formLogin(form -> form.disable()) // disable default login form
-                .httpBasic(httpBasic -> httpBasic.disable()); // disable basic auth
+
+                // No form login or http basic (we'll use JWT later)
+                .formLogin(form -> form.disable())
+                .httpBasic(httpBasic -> httpBasic.disable());
 
         return http.build();
     }
