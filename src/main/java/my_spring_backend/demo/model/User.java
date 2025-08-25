@@ -18,6 +18,7 @@ public class User {
     @Id
     private long id; // Auto-increment ID
 
+    private String name;
     private String username;
     private String email;
     private String password;

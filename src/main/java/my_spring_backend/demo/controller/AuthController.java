@@ -7,6 +7,7 @@ import my_spring_backend.demo.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.Map;
 
 @RestController
@@ -39,6 +40,13 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<?> resetPassword(@RequestParam("token") String token, @RequestBody ResetPasswordRequest request) {
         return authService.resetPassword(token, request);
+    }
+
+    @PostMapping("/google/login")
+    public ResponseEntity<?> loginWithGoogle(@RequestBody Map<String, String> request) {
+        String credential = request.get("credential");
+        String token = authService.loginWithGoogle(credential);
+        return ResponseEntity.ok(Collections.singletonMap("accessToken", token));
     }
 
 

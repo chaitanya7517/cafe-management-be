@@ -1,5 +1,10 @@
 package my_spring_backend.demo.service;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import org.springframework.beans.factory.annotation.Value;
 import my_spring_backend.demo.config.JwtUtil;
 import my_spring_backend.demo.dto.ApiResponse;
 import my_spring_backend.demo.dto.ResetPasswordRequest;
@@ -8,10 +13,10 @@ import my_spring_backend.demo.model.PasswordResetToken;
 import my_spring_backend.demo.model.User;
 import my_spring_backend.demo.repository.PasswordResetTokenRepository;
 import my_spring_backend.demo.repository.UserRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +30,9 @@ public class AuthService {
     private static final AtomicLong counter = new AtomicLong(0); // auto increment id
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+
+    @Value("${spring.security.oauth2.client.registration.google.client-id}")
+    private String googleClientId;   
 
     public AuthService(UserRepository userRepository, JwtUtil jwtUtil, PasswordResetTokenRepository passwordResetTokenRepository, EmailService emailService) {
         this.userRepository = userRepository;
@@ -109,5 +117,43 @@ public class AuthService {
         userRepository.save(user);
 
         return ResponseEntity.ok(new ApiResponse<>(200, "Password reset successful", null));
+    }
+
+    public String loginWithGoogle(String credential) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    JacksonFactory.getDefaultInstance()
+            ).setAudience(Collections.singletonList(googleClientId)) // ✅ injected value
+                    .build();
+
+
+            GoogleIdToken idToken = verifier.verify(credential);
+            if (idToken == null) {
+                throw new RuntimeException("Invalid Google token");
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            String name = (String) payload.get("name");
+            String googleId = payload.getSubject();
+
+            // check if user exists
+            User user = userRepository.findByEmail(email).orElse(null);
+
+            if (user == null) {
+                // first time user → create account
+                user = new User();
+                user.setEmail(email);
+                user.setName(name);
+                userRepository.save(user);
+            }
+
+            // issue JWT
+            return jwtUtil.generateToken(String.valueOf(user.getId()));
+
+        } catch (Exception e) {
+            throw new RuntimeException("Google login failed: " + e.getMessage());
+        }
     }
 }
