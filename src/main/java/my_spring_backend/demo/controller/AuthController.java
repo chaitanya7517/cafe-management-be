@@ -1,6 +1,7 @@
 package my_spring_backend.demo.controller;
 
 import my_spring_backend.demo.dto.ResetPasswordRequest;
+import my_spring_backend.demo.dto.ProfileUpdateRequest;
 import my_spring_backend.demo.model.PasswordResetToken;
 import my_spring_backend.demo.model.User;
 import my_spring_backend.demo.service.AuthService;
@@ -51,4 +52,11 @@ public class AuthController {
         return authService.refreshToken(request.get("refreshToken"));
     }
 
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(
+            @RequestHeader("X-Authorization") String token,
+            @RequestBody ProfileUpdateRequest request
+    ) {
+        return authService.updateProfile(token, request);
+    }
 }
