@@ -7,7 +7,6 @@ import my_spring_backend.demo.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
 import java.util.Map;
 
 @RestController
@@ -44,9 +43,12 @@ public class AuthController {
 
     @PostMapping("/google/login")
     public ResponseEntity<?> loginWithGoogle(@RequestBody Map<String, String> request) {
-        String credential = request.get("credential");
-        String token = authService.loginWithGoogle(credential);
-        return ResponseEntity.ok(Collections.singletonMap("accessToken", token));
+        return authService.loginWithGoogle(request.get("credential"));
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> request) {
+        return authService.refreshToken(request.get("refreshToken"));
     }
 
 

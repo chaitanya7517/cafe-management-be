@@ -4,21 +4,23 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Value;
 import my_spring_backend.demo.config.JwtUtil;
 import my_spring_backend.demo.dto.ApiResponse;
 import my_spring_backend.demo.dto.ResetPasswordRequest;
+import my_spring_backend.demo.dto.TokenResponse;
 import my_spring_backend.demo.exception.UserAlreadyExistsException;
 import my_spring_backend.demo.model.PasswordResetToken;
 import my_spring_backend.demo.model.User;
 import my_spring_backend.demo.repository.PasswordResetTokenRepository;
 import my_spring_backend.demo.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -62,27 +64,46 @@ public class AuthService {
         user.setId(counter.incrementAndGet());
         userRepository.save(user);
 
-        // generate token using user id
-        String token = jwtUtil.generateToken(String.valueOf(user.getId()));
+        String userId = String.valueOf(user.getId());
+        String accessToken = jwtUtil.generateAccessToken(userId);
+        String refreshToken = jwtUtil.generateRefreshToken(userId);
 
-        Map<String, String> response = new HashMap<>();
-        response.put("accessToken", token);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new TokenResponse(accessToken, refreshToken));
     }
 
 
     public ResponseEntity<?> login(String usernameOrEmail, String password) {
         Optional<User> user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail);
         if (user.isPresent() && user.get().getPassword().equals(password)) {
-            String token =  jwtUtil.generateToken(String.valueOf(user.get().getId()));
-            Map<String, String> response = new HashMap<>();
-            response.put("accessToken", token);
+            String userId = String.valueOf(user.get().getId());
+            String accessToken = jwtUtil.generateAccessToken(userId);
+            String refreshToken = jwtUtil.generateRefreshToken(userId);
 
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(new TokenResponse(accessToken, refreshToken));
         }
         throw new RuntimeException("Invalid username/email or password");
     }
+
+    // Add new method for refresh token
+    public ResponseEntity<TokenResponse> refreshToken(String refreshToken) {
+        try {
+            if (jwtUtil.validateToken(refreshToken)) {
+                String userId = jwtUtil.extractUserId(refreshToken);
+                String newAccessToken = jwtUtil.generateAccessToken(userId);
+
+                return ResponseEntity.ok(new TokenResponse(newAccessToken, refreshToken));
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+        } catch (ExpiredJwtException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new TokenResponse(null, "Refresh token expired, please login again"));
+        } catch (JwtException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new TokenResponse(null, "Invalid refresh token"));
+        }
+    }
+
 
     public ResponseEntity<?> createToken(PasswordResetToken data) {
         Optional<User> user = userRepository.findByEmail(data.getEmail());
@@ -119,7 +140,7 @@ public class AuthService {
         return ResponseEntity.ok(new ApiResponse<>(200, "Password reset successful", null));
     }
 
-    public String loginWithGoogle(String credential) {
+    public ResponseEntity<TokenResponse> loginWithGoogle(String credential) {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(),
@@ -150,7 +171,8 @@ public class AuthService {
             }
 
             // issue JWT
-            return jwtUtil.generateToken(String.valueOf(user.getId()));
+            String userId = String.valueOf(user.getId());
+            return ResponseEntity.ok(new TokenResponse(jwtUtil.generateAccessToken(userId), jwtUtil.generateRefreshToken(userId)));
 
         } catch (Exception e) {
             throw new RuntimeException("Google login failed: " + e.getMessage());
