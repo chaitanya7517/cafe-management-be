@@ -50,16 +50,10 @@ public class AuthService {
     }
 
     public ResponseEntity<?> register(User user) {
-        // check if username already exists
-        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
-            throw new UserAlreadyExistsException("Username already exists!");
-        }
-
-        // check if email already exists
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+        if (user.getName() == null || user.getName().trim().isEmpty())
+            throw new IllegalArgumentException("Please add name!");
+        if (userRepository.findByEmail(user.getEmail()).isPresent())
             throw new UserAlreadyExistsException("Email already exists!");
-        }
-
         // set autoincrement id
         user.setId(counter.incrementAndGet());
         userRepository.save(user);
@@ -71,9 +65,8 @@ public class AuthService {
         return ResponseEntity.ok(new TokenResponse(accessToken, refreshToken));
     }
 
-
-    public ResponseEntity<?> login(String usernameOrEmail, String password) {
-        Optional<User> user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail);
+    public ResponseEntity<?> login(String email, String password) {
+        Optional<User> user = userRepository.findByEmail(email);
         if (user.isPresent() && user.get().getPassword().equals(password)) {
             String userId = String.valueOf(user.get().getId());
             String accessToken = jwtUtil.generateAccessToken(userId);
@@ -84,7 +77,6 @@ public class AuthService {
         throw new RuntimeException("Invalid username/email or password");
     }
 
-    // Add new method for refresh token
     public ResponseEntity<TokenResponse> refreshToken(String refreshToken) {
         try {
             if (jwtUtil.validateToken(refreshToken)) {
@@ -104,16 +96,13 @@ public class AuthService {
         }
     }
 
-
-    public ResponseEntity<?> createToken(PasswordResetToken data) {
+    public ResponseEntity<?> createTokenForForgotPassword(PasswordResetToken data) {
         Optional<User> user = userRepository.findByEmail(data.getEmail());
         if (user.isEmpty()) {
             throw new RuntimeException("User not found for " + data.getEmail() + " email");
         }
-
         // Save token in DB
         PasswordResetToken savedToken = passwordResetTokenRepository.save(data);
-
         // Send email with token link
         emailService.sendResetPasswordEmail(data.getEmail(), savedToken.getId());
 
@@ -147,7 +136,6 @@ public class AuthService {
                     JacksonFactory.getDefaultInstance()
             ).setAudience(Collections.singletonList(googleClientId)) // ✅ injected value
                     .build();
-
 
             GoogleIdToken idToken = verifier.verify(credential);
             if (idToken == null) {

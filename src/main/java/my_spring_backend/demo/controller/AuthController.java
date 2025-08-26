@@ -28,12 +28,12 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
-        return authService.login(request.get("usernameOrEmail"), request.get("password"));
+        return authService.login(request.get("email"), request.get("password"));
     }
 
     @PostMapping("/forgot-password/token")
     public ResponseEntity<?> forgotPassword(@RequestBody PasswordResetToken data) {
-        return authService.createToken(data);
+        return authService.createTokenForForgotPassword(data);
     }
 
     @PostMapping("/forgot-password")
@@ -50,6 +50,5 @@ public class AuthController {
     public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> request) {
         return authService.refreshToken(request.get("refreshToken"));
     }
-
 
 }
